@@ -1,15 +1,20 @@
 set -euo pipefail
 IFS=$'\n\t'
 
-case $(uname -s) in
-MINGW64_NT?*)
-  ztcli="/c/Program Files (x86)/ZeroTier/One/zerotier-cli.bat"
+if [ -z "$(which zerotier-cli)" ]; then
+  case $(uname -s) in
+  MINGW64_NT?*)
+    ztcli="/c/Program Files (x86)/ZeroTier/One/zerotier-cli.bat"
+    member_id=$("${ztcli}" info | awk '{ print $3 }')
+    ;;
+  *)
+    member_id=$(sudo zerotier-cli info | awk '{ print $3 }')
+    ;;
+  esac
+else
+  ztcli="zerotier-cli"
   member_id=$("${ztcli}" info | awk '{ print $3 }')
-  ;;
-*)
-  member_id=$(sudo zerotier-cli info | awk '{ print $3 }')
-  ;;
-esac
+fi
 
 echo "⏁  Removing Runner from ZeroTier network"
 curl -i -s -X DELETE -H "Authorization: token $AUTH_TOKEN" "$API_URL/network/$NETWORK_ID/member/${member_id}" >/tmp/api_delete_output.txt

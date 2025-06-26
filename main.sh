@@ -5,17 +5,38 @@ echo "⏁  Installing ZeroTier"
 # /home/runner/work/zerotier-github-action/zerotier-github-action/./
 echo $GITHUB_ACTION_PATH
 
-case $(uname -s) in
-MINGW64_NT?*)
-  pwsh "$GITHUB_ACTION_PATH/util/install.ps1"
-  ztcli="/c/Program Files (x86)/ZeroTier/One/zerotier-cli.bat"
+DAEMON_TIMEOUT=10
+
+if [ -z "$(which zerotier-cli)" ]; then
+  case $(uname -s) in
+  MINGW64_NT?*)
+    pwsh "$GITHUB_ACTION_PATH/util/install.ps1"
+    ztcli="/c/Program Files (x86)/ZeroTier/One/zerotier-cli.bat"
+    member_id=$("${ztcli}" info | awk '{ print $3 }')
+    ;;
+  *)
+    . $GITHUB_ACTION_PATH/util/install.sh &>/dev/null
+    member_id=$(sudo zerotier-cli info | awk '{ print $3 }')
+    ;;
+  esac
+else
+  if [ -z "$(pgrep -f zerotier-one)" ]; then
+    echo "ZeroTier is not running. Starting it..."
+    sudo zerotier-one &
+    start_time=$(date +%s)
+    while [ "$(zerotier-cli info | awk '{ print $5 }')" != "ONLINE" ]; do
+      current_time=$(date +%s)
+      if [ $((current_time - start_time)) -ge $DAEMON_TIMEOUT ]; then
+        echo "ZeroTier failed to come online after $DAEMON_TIMEOUT seconds"
+        exit 1
+      fi
+      sleep 0.5
+    done
+    echo "ZeroTier started."
+  fi
+  ztcli="zerotier-cli"
   member_id=$("${ztcli}" info | awk '{ print $3 }')
-  ;;
-*)
-  . $GITHUB_ACTION_PATH/util/install.sh &>/dev/null
-  member_id=$(sudo zerotier-cli info | awk '{ print $3 }')
-  ;;
-esac
+fi
 
 echo "⏁  Authorizing Runner to ZeroTier network"
 MAX_RETRIES=10
@@ -49,4 +70,3 @@ MINGW64_NT?*)
   while ! sudo zerotier-cli listnetworks | grep $NETWORK_ID | grep OK; do sleep 0.5; done
   ;;
 esac
-
