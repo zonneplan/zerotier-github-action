@@ -19,24 +19,24 @@ if [ -z "$(which zerotier-cli)" ]; then
     member_id=$(sudo zerotier-cli info | awk '{ print $3 }')
     ;;
   esac
-else
-  if [ -z "$(pgrep -f zerotier-one)" ]; then
-    echo "ZeroTier is not running. Starting it..."
-    sudo zerotier-one &
-    start_time=$(date +%s)
-    while [ "$(zerotier-cli info | awk '{ print $5 }')" != "ONLINE" ]; do
-      current_time=$(date +%s)
-      if [ $((current_time - start_time)) -ge $DAEMON_TIMEOUT ]; then
-        echo "ZeroTier failed to come online after $DAEMON_TIMEOUT seconds"
-        exit 1
-      fi
-      sleep 0.5
-    done
-    echo "ZeroTier started."
-  fi
-  ztcli="zerotier-cli"
-  member_id=$("${ztcli}" info | awk '{ print $3 }')
 fi
+
+if [ -z "$(pgrep -f zerotier-one)" ]; then
+  echo "ZeroTier is not running. Starting it..."
+  sudo zerotier-one &
+  start_time=$(date +%s)
+  while [ "$(zerotier-cli info | awk '{ print $5 }')" != "ONLINE" ]; do
+    current_time=$(date +%s)
+    if [ $((current_time - start_time)) -ge $DAEMON_TIMEOUT ]; then
+      echo "ZeroTier failed to come online after $DAEMON_TIMEOUT seconds"
+      exit 1
+    fi
+    sleep 0.5
+  done
+  echo "ZeroTier started."
+fi
+ztcli="zerotier-cli"
+member_id=$("${ztcli}" info | awk '{ print $3 }')
 
 echo "⏁  Authorizing Runner to ZeroTier network"
 MAX_RETRIES=10
